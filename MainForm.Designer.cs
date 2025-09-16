@@ -53,7 +53,7 @@
             ClientSize = new Size(800, 450);
             Controls.Add(splitContainer1);
             Name = "MainForm";
-            Text = "Form1";
+            Text = "Customer Manager";
             Load += Form1_Load;
             ((System.ComponentModel.ISupportInitialize)splitContainer1).EndInit();
             splitContainer1.ResumeLayout(false);
