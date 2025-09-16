@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\Nehemiah\\Desktop\\CustomerManager\\CustomerManager.csproj": {}
+    "C:\\Users\\Nehemiah\\Desktop\\temp\\KlipboardAssessment\\CustomerManager.csproj": {}
   },
   "projects": {
-    "C:\\Users\\Nehemiah\\Desktop\\CustomerManager\\CustomerManager.csproj": {
+    "C:\\Users\\Nehemiah\\Desktop\\temp\\KlipboardAssessment\\CustomerManager.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\Nehemiah\\Desktop\\CustomerManager\\CustomerManager.csproj",
+        "projectUniqueName": "C:\\Users\\Nehemiah\\Desktop\\temp\\KlipboardAssessment\\CustomerManager.csproj",
         "projectName": "CustomerManager",
-        "projectPath": "C:\\Users\\Nehemiah\\Desktop\\CustomerManager\\CustomerManager.csproj",
+        "projectPath": "C:\\Users\\Nehemiah\\Desktop\\temp\\KlipboardAssessment\\CustomerManager.csproj",
         "packagesPath": "C:\\Users\\Nehemiah\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\Nehemiah\\Desktop\\CustomerManager\\obj\\",
+        "outputPath": "C:\\Users\\Nehemiah\\Desktop\\temp\\KlipboardAssessment\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
