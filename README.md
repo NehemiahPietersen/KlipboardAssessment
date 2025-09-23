@@ -3,7 +3,7 @@
 ## Customer Manager
 A simple and efficient desktop application built with C# and Windows Forms for managing customer information and their related transactions. It uses a local database for reliable, offline data storage.
 
-**NOTE: The file has been published to the "PublishFolder" of the Project**
+**NOTE: The file has been published to the "PublishFolder" or follow the "path:KlipboardAssessment\bin\publish" of the Project**
 
 ## Features
 1. Customer Management: Add, view, edit, and delete customer records.
