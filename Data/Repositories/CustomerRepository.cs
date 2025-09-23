@@ -1,4 +1,5 @@
 ﻿using CustomerManager.Data.Entities;
+using KlipBoardAssessment.Data.Repositories.Interface;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
@@ -6,30 +7,27 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace CustomerManager.Data.Repositories
+namespace KlipBoardAssessment.Data.Repositories
 {
     public class CustomerRepository : Repository<Customer>, ICustomerRepository
     {
         public CustomerRepository(ApplicationDbContext context) : base(context)
-        { }
-
-        public async Task<Customer> GetByAccountAsync(string account)
         {
-            return await _context.Customers
-                .Where(c => c.Account == account)
-                .FirstOrDefaultAsync();
         }
 
-        public Customer GetCustomerByAccount(string? account)
+        public Customer GetByAccountNumber(string accountNumber)
         {
-            return _context.Customers.FirstOrDefault(c => c.Account == account);
+            return DbSet.FirstOrDefault(c => c.Account == accountNumber);
         }
 
-        public async Task<IEnumerable<Customer>> GetCustomerWithTransacionsAsync()
+        public IEnumerable<Customer> GetCustomersWithTransactions()
         {
-            return await _context.Customers
-                .Include(c => c.Transactions)
-                .ToListAsync();
+            return DbSet.Include(c => c.Transactions).ToList();
+        }
+
+        public IEnumerable<Customer> GetAllWithTransactions()
+        {
+            return DbSet.Include(c => c.Transactions).ToList();
         }
     }
 }

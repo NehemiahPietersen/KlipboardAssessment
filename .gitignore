@@ -1,6 +1,0 @@
-# Ignore build outputs
-bin/
-obj/
-*.deploy
-*.dll
-*.exe

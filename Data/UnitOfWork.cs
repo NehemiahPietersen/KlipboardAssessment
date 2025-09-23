@@ -1,70 +1,34 @@
-﻿using CustomerManager.Data.Repositories;
+﻿using KlipBoardAssessment.Data.Repositories;
+using KlipBoardAssessment.Data.Repositories.Interface;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using System.Transactions;
 
-namespace CustomerManager.Data
+namespace KlipBoardAssessment.Data
 {
-    public class UnitOfWork : IDisposable
+    public class UnitOfWork : IUnitOfWork
     {
         private readonly ApplicationDbContext _context;
-        private bool _disposal = false;
+        public ICustomerRepository Customers { get; private set; }
+        public ITransactionRepository Transactions { get; private set; }
 
-        public UnitOfWork(ApplicationDbContext applicationDbContext)
+        public UnitOfWork(ApplicationDbContext context)
         {
-            _context = new ApplicationDbContext();
+            _context = context;
             Customers = new CustomerRepository(_context);
             Transactions = new TransactionRepository(_context);
         }
 
-        public ICustomerRepository Customers { get; private set; }
-        public ITransactionRepository Transactions { get; private set; }
-
-        //CRUD Operations
-        public int SaveChanges()
+        public int Complete()
         {
             return _context.SaveChanges();
         }
 
-        public async Task<int> SaveChangesAsync()
-        {
-            return await _context.SaveChangesAsync();
-        }
-
-        public void EnsureCreated()
-        {
-            _context.Database.EnsureCreated();
-        }
-
-        public async Task EnsureCreatedAsync()
-        {
-            await _context.Database.EnsureCreatedAsync();
-        }
-
-        protected virtual void Dispose(bool disposing)
-        {
-            if (!_disposal)
-            {
-                if (disposing)
-                {
-                    _context.Dispose();
-                }
-                _disposal = true;
-            }
-        }
-
         public void Dispose()
         {
-            Dispose(true);
-            GC.SuppressFinalize(this);
-        }
-
-        public ApplicationDbContext GetContext()
-        {
-            return _context;
+            _context.Dispose();
         }
     }
 }

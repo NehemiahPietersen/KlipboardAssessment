@@ -1,518 +1,491 @@
-﻿using CustomerManager.Data;
 using CustomerManager.Data.Entities;
-using CustomerManager.Forms;
-using CustomerManager.Forms.Enquiries;
-using CustomerManager.Forms.Transactions;
-using Microsoft.EntityFrameworkCore;
-using System.Globalization;
-using System.Security.Principal;
+using KlipBoardAssessment.Data;
+using KlipBoardAssessment.Data.Repositories.Interface;
+using KlipBoardAssessment.Forms.Customers;
+using KlipBoardAssessment.Forms.Transactions;
+using KlipBoardAssessment.Services;
+using System.ComponentModel;
 using System.Windows.Forms;
 
-namespace CustomerManager
+namespace KlipBoardAssessment
 {
     public partial class MainForm : Form
     {
-        private UnitOfWork _unitOfWork;
-        private string _currentTable;
-        private Button _btnAddCustomer; 
-        private Button _btnEditCustomer; 
-        private Button _btnAddTransaction; 
-        private Button _btnEditTransaction; 
-        private DataGridView dataGridView; 
-        private Button customerBtn;
-        private Button transactionBtn;
-        private string _selectedSort = "Name";
-        private ComboBox _customerSortComboBox;
-        private ComboBox _transactionSortComboBox;
-        private string _selectedTransactionSort = "Date Added";
+        private readonly UnitOfWork _unitOfWork;
+        private readonly BindingList<Customer> _customersBindingList;
+        private readonly BindingList<Transaction> _transactionsBindingList;
+        private ViewMode _currentViewMode;
+
+        private enum ViewMode
+        {
+            Customers,
+            Transactions
+        }
 
         public MainForm()
         {
             InitializeComponent();
-            _unitOfWork = new UnitOfWork(new ApplicationDbContext());
+
+            //initialize database
+            var context = new ApplicationDbContext();
+            var initializer = new DatabaseInitializer(context);
+            initializer.Initialize();
+
+            _unitOfWork = new UnitOfWork(context);
+            _customersBindingList = new BindingList<Customer>();
+            _transactionsBindingList = new BindingList<Transaction>();
+
             InitializeUI();
+            SwitchToView(ViewMode.Customers);
         }
 
         private void InitializeUI()
         {
-            //Initialize UI components and event handlers here
+            SetupDataGridView();
+            SetupEventHandlers();
+            ApplyInitialStyling();
 
-            //CustomerButtons
-            customerBtn = new Button
-            {
-                Text = "Customers",
-                Dock = DockStyle.Top,
-                Name = "customerBtn"
-            };
-            customerBtn.Click += CustomerBtn_Click;
+            // Ensure buttons are properly positioned and visible
+            PositionHeaderControls();
+        }
 
-            _btnAddCustomer = new Button
-            {
-                Text = "Add Customer",
-                Visible = false,
-                Dock = DockStyle.Top,
-                Name = "btnAddCustomer"
-            };
-            _btnAddCustomer.Click += AddCustomersBtn_Click;
-            splitContainer1.Panel2.Controls.Add(_btnAddCustomer);
+        private void SetupDataGridView()
+        {
+            dataGridView.AutoGenerateColumns = false;
+            dataGridView.ReadOnly = true;
+            dataGridView.AllowUserToAddRows = false;
+            dataGridView.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
 
-            _btnEditCustomer = new Button
-            {
-                Text = "Edit Customer",
-                Visible = false,
-                Dock = DockStyle.Top,
-                Name = "btnEditCustomer"
-            };
-            _btnEditCustomer.Click += EditCustomerBtn_Click;
-            splitContainer1.Panel2.Controls.Add(_btnEditCustomer);
-
-            //TransactionButtons
-            transactionBtn = new Button
-            {
-                Text = "Transactions",
-                Dock = DockStyle.Top,
-                Name = "transactionBtn"
-            };
-            transactionBtn.Click += TransactionBtn_Click;
-
-            _btnAddTransaction = new Button
-            {
-                Text = "Add Transaction",
-                Visible = false,
-                Dock = DockStyle.Top,
-                Name = "btnAddTransaction"
-            };
-            _btnAddTransaction.Click += AddTransactionButton_Click;
-            splitContainer1.Panel2.Controls.Add(_btnAddTransaction);
-
-            _btnEditTransaction = new Button
-            {
-                Text = "Edit Transaction",
-                Visible = false,
-                Dock = DockStyle.Top,
-                Name = "btnEditTransaction"
-            };
-            _btnEditTransaction.Click += EditTransactionBtn_Click;
-            splitContainer1.Panel2.Controls.Add(_btnEditTransaction);
-
-            //DataGridView
-            Panel dataGridPanel = new Panel
-            {
-                Dock = DockStyle.Fill,
-                Padding = new Padding(0, 80, 0, 0),
-                Name = "dataGridPanel"
-            };
-
-            //Create the DataGridView
-            dataGridView = new DataGridView
-            {
-                Dock = DockStyle.Fill,
-                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
-                ReadOnly = true,
-                AllowUserToAddRows = false,
-                Name = "dataGridView"
-            };
-            dataGridView.CellFormatting += dataGridView_CellFormatting;
-            dataGridView.CellContentClick += DataGridView_CellContentClick;
-
-            DataGridViewButtonColumn deleteColumn = new DataGridViewButtonColumn
-            {
-                Name = "Delete",
-                HeaderText = "Delete",
-                Text = "Delete",
-                UseColumnTextForButtonValue = true,
-                Width = 60
-            };
-            dataGridView.Columns.Add(deleteColumn);
-
-            //Add the DataGridView to the padded panel
-            dataGridPanel.Controls.Add(dataGridView);
+            // Common columns setup
+            dataGridView.CellFormatting += DataGridView_CellFormatting;
             dataGridView.CellDoubleClick += DataGridView_CellDoubleClick;
-
-            //Add the panel to the SplitContainer's Panel2
-            splitContainer1.Panel2.Controls.Add(dataGridPanel);
-
-            ApplyTabStyle(customerBtn);
-            ApplyTabStyle(transactionBtn);
-
-            //Sorting
-            _customerSortComboBox = new ComboBox
-            {
-                Name = "customerSortComboBox",
-                Dock = DockStyle.Top,
-                DropDownStyle = ComboBoxStyle.DropDownList
-            };
-            _customerSortComboBox.Items.AddRange(new[] { "Name", "Account", "Date Added" });
-            _customerSortComboBox.SelectedIndexChanged += CustomerSortComboBox_SelectedIndexChanged;
-
-            _transactionSortComboBox = new ComboBox
-            {
-                Name = "transactionSortComboBox",
-                Dock = DockStyle.Top,
-                DropDownStyle = ComboBoxStyle.DropDownList,
-                Visible = false // Start hidden
-            };
-            _transactionSortComboBox.Items.AddRange(new[] { "Account", "Name", "Outstanding Amount", "Date Added" });
-            _transactionSortComboBox.SelectedIndexChanged += TransactionSortComboBox_SelectedIndexChanged;
-
-            splitContainer1.Panel1.Controls.Add(transactionBtn);
-            splitContainer1.Panel1.Controls.Add(customerBtn);
-
-            dataGridPanel.Controls.Add(dataGridView);
-            splitContainer1.Panel2.Controls.Add(dataGridPanel);
-            splitContainer1.Panel2.Controls.Add(_transactionSortComboBox);
-            splitContainer1.Panel2.Controls.Add(_customerSortComboBox);
-            splitContainer1.Panel2.Controls.SetChildIndex(_transactionSortComboBox, 0);
-            splitContainer1.Panel2.Controls.SetChildIndex(_customerSortComboBox, 0);
-
-            dataGridView.DataSource = LoadCustomers();
-
-            CustomerBtn_Click(null, EventArgs.Empty);
+            dataGridView.CellContentClick += DataGridView_CellContentClick;
         }
 
-        //CUSTOMERS
-        private void CustomerBtn_Click(object sender, EventArgs e)
+        private void PositionHeaderControls()
         {
-            SelectTab(customerBtn);
-            ShowCustomerButtons();
+            btnAdd.Location = new Point(10, 8);
+            btnEdit.Location = new Point(110, 8);
+            cmbSort.Location = new Point(pnlHeader.Width - cmbSort.Width - 10, 8);
 
-            _customerSortComboBox.Visible = true;
-            _transactionSortComboBox.Visible = false;
+            pnlHeader.Height = 50;
 
-            dataGridView.DataSource = LoadCustomers(_selectedSort);
+            btnAdd.Visible = true;
+            btnEdit.Visible = true;
+            cmbSort.Visible = true;
         }
 
-        private void AddCustomersBtn_Click(object sender, EventArgs e)
-        {
-            using (var addCustomerForm = new AddCustomer(_unitOfWork))
-            {
-                var result = addCustomerForm.ShowDialog();
 
-                if (result == DialogResult.OK)
-                {
-                    dataGridView.DataSource = LoadCustomers(_selectedSort);
-                }
-            }
+        private void SetupEventHandlers()
+        {
+            btnCustomers.Click += (s, e) => SwitchToView(ViewMode.Customers);
+            btnTransactions.Click += (s, e) => SwitchToView(ViewMode.Transactions);
+            btnAdd.Click += BtnAdd_Click;
+            btnEdit.Click += BtnEdit_Click;
+            cmbSort.SelectedIndexChanged += CmbSort_SelectedIndexChanged;
         }
 
-        private void EditCustomerBtn_Click(object sender, EventArgs e)
+        private void ApplyInitialStyling()
         {
-            if (dataGridView.CurrentRow == null)
-            {
-                MessageBox.Show("Please select a customer to edit.");
-                return;
-            }
-
-            int customerId = (int)dataGridView.CurrentRow.Cells["CustomerId"].Value;
-
-
-            using (var editForm = new EditCustomer(_unitOfWork, customerId))
-            {
-                if (editForm.ShowDialog() == DialogResult.OK)
-                {
-                    dataGridView.DataSource = LoadCustomers(_selectedSort);
-                }
-            }
-        }
-
-        public List<Customer> LoadCustomers(string sortBy = "Name")
-        {
-            using (var context = new ApplicationDbContext())
-            {
-                IQueryable<Customer> query = context.Customers;
-
-                switch (sortBy)
-                {
-                    case "Account":
-                        query = query.OrderBy(c => c.Account);
-                        break;
-                    case "Date Added":
-                        query = query.OrderBy(c => c.CreatedAt); // Make sure you have CreatedAt
-                        break;
-                    default:
-                        query = query.OrderBy(c => c.CustomerName);
-                        break;
-                }
-
-                var customers = query.ToList();
-
-                dataGridView.DataSource = customers;
-
-                if (!dataGridView.Columns.Contains("Delete"))
-                {
-                    DataGridViewButtonColumn deleteColumn = new DataGridViewButtonColumn
-                    {
-                        Name = "Delete",
-                        HeaderText = "",
-                        Text = "Delete",
-                        UseColumnTextForButtonValue = true,
-                        Width = 70,
-                        FlatStyle = FlatStyle.Flat
-                    };
-                    dataGridView.Columns.Add(deleteColumn);
-                }
-
-                return customers;
-            }
-        }
-
-        //TRANSACTIONS
-        private void TransactionBtn_Click(object sender, EventArgs e)
-        {
-            SelectTab(transactionBtn);
-            ShowTransactionButtons();
-
-            _customerSortComboBox.Visible = false;
-            _transactionSortComboBox.Visible = true;
-
-            dataGridView.DataSource = LoadTransactions(_selectedTransactionSort);
-        }
-
-        private void AddTransactionButton_Click(object sender, EventArgs e)
-        {
-            using (var addTransactionForm = new AddTransaction(_unitOfWork))
-            {
-                if (addTransactionForm.ShowDialog() == DialogResult.OK)
-                {
-                    dataGridView.DataSource = LoadTransactions();
-                }
-            }
-        }
-
-        private void EditTransactionBtn_Click(object sender, EventArgs e)
-        {
-            //Check if a row is selected
-            if (dataGridView.CurrentRow == null || dataGridView.CurrentRow.Index < 0)
-            {
-                MessageBox.Show("Please select a transaction to edit.");
-                return;
-            }
-
-            using (var editTransactionForm = new EditTransaction())
-            {
-                if (editTransactionForm.ShowDialog() == DialogResult.OK)
-                {
-                    //Refresh data after editing transaction
-                    dataGridView.DataSource = LoadTransactions();
-                    MessageBox.Show("Transaction updated successfully!");
-                }
-            }
-        }
-
-        public List<Transaction> LoadTransactions(string sortBy = "Date Added")
-        {
-            using (var context = new ApplicationDbContext())
-            {
-                IQueryable<Transaction> query = context.Transactions.Include(t => t.Customer); // assuming navigation property
-
-                switch (sortBy)
-                {
-                    case "Account":
-                        query = query.OrderBy(t => t.Customer.Account);
-                        break;
-                    case "Name":
-                        query = query.OrderBy(t => t.Customer.CustomerName);
-                        break;
-                    case "Outstanding Amount":
-                        query = query.OrderByDescending(t => t.Customer.Balance);
-                        break;
-                    case "Date Added":
-                        query = query.OrderByDescending(t => t.CreatedAt);
-                        break;
-                    default:
-                        query = query.OrderByDescending(t => t.CreatedAt);
-                        break;
-                }
-
-                return query.ToList();
-            }
-
-        }
-
-        //HELPER METHODS
-        private void SelectTab(Button selectedButton)
-        {
-            foreach (Control ctrl in splitContainer1.Panel1.Controls)
+            // Apply styling to navigation buttons
+            foreach (Control ctrl in pnlNavigation.Controls)
             {
                 if (ctrl is Button btn)
                 {
-                    btn.BackColor = SystemColors.Control;
-                    btn.ForeColor = Color.Black;
-                    btn.Font = new Font(btn.Font, FontStyle.Regular);
+                    btn.FlatStyle = FlatStyle.Flat;
+                    btn.FlatAppearance.BorderSize = 0;
+                    btn.TextAlign = ContentAlignment.MiddleLeft;
+                    btn.Padding = new Padding(10, 0, 0, 0);
+                    btn.Height = 40;
                 }
             }
-
-            selectedButton.BackColor = Color.LightSteelBlue;
-            selectedButton.ForeColor = Color.Black;
-            selectedButton.Font = new Font(selectedButton.Font, FontStyle.Bold);
         }
 
-        private void ApplyTabStyle(Button btn)
+        private void SwitchToView(ViewMode mode)
         {
-            btn.FlatStyle = FlatStyle.Flat;
-            btn.TextAlign = ContentAlignment.MiddleLeft;
-            btn.Dock = DockStyle.Top;
-            btn.Height = 40;
-            btn.FlatAppearance.BorderSize = 0;
-            btn.Margin = new Padding(0);
+            _currentViewMode = mode;
+            UpdateNavigationHighlight();
+            UpdateButtonVisibility();
+            LoadData();
+            UpdateSortComboBox();
         }
 
-        private void TableList_SelectedIndexChanged(object? sender, EventArgs e)
+        private void UpdateNavigationHighlight()
         {
-            var listBox = (ListBox)sender;
+            btnCustomers.BackColor = _currentViewMode == ViewMode.Customers ?
+                Color.LightSteelBlue : SystemColors.Control;
+            btnTransactions.BackColor = _currentViewMode == ViewMode.Transactions ?
+                Color.LightSteelBlue : SystemColors.Control;
 
-            if (listBox.SelectedItem == null)
-                return;
+            btnCustomers.Font = new Font(btnCustomers.Font,
+                _currentViewMode == ViewMode.Customers ? FontStyle.Bold : FontStyle.Regular);
+            btnTransactions.Font = new Font(btnTransactions.Font,
+                _currentViewMode == ViewMode.Transactions ? FontStyle.Bold : FontStyle.Regular);
+        }
 
-            _currentTable = listBox.SelectedItem.ToString();
+        private void UpdateButtonVisibility()
+        {
+            btnAdd.Visible = true;
+            btnEdit.Visible = true;
 
-            switch (_currentTable)
+            btnAdd.Text = _currentViewMode == ViewMode.Customers ?
+                "Add Customer" : "Add Transaction";
+            btnEdit.Text = _currentViewMode == ViewMode.Customers ?
+                "Edit Customer" : "Edit Transaction";
+        }
+
+        private void UpdateSortComboBox()
+        {
+            cmbSort.Items.Clear();
+
+            if (_currentViewMode == ViewMode.Customers)
             {
-                case "Customers":
-                    LoadCustomers();
-                    break;
-                case "Transactions":
-                    LoadTransactions();
-                    break;
+                cmbSort.Items.AddRange(new[] { "Name", "Account", "Date Added" });
+                cmbSort.SelectedItem = "Name";
+            }
+            else
+            {
+                cmbSort.Items.AddRange(new[] { "Date Added", "Account", "Name", "Amount" });
+                cmbSort.SelectedItem = "Date Added";
             }
         }
-        private void ShowCustomerButtons()
-        {
-            _btnAddCustomer.Visible = true;
-            _btnEditCustomer.Visible = true;
 
-            _btnAddTransaction.Visible = false;
-            _btnEditTransaction.Visible = false;
+        private void LoadData()
+        {
+            try
+            {
+                if (_currentViewMode == ViewMode.Customers)
+                {
+                    LoadCustomers();
+                }
+                else
+                {
+                    LoadTransactions();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error loading data: {ex.Message}", "Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
-        private void ShowTransactionButtons()
+        private void LoadCustomers()
         {
-            _btnAddCustomer.Visible = false;
-            _btnEditCustomer.Visible = false;
+            var sortBy = cmbSort.SelectedItem?.ToString() ?? "Name";
+            var customers = GetCustomersSorted(sortBy);
 
-            _btnAddTransaction.Visible = true;
-            _btnEditTransaction.Visible = true;
+            _customersBindingList.Clear();
+            foreach (var customer in customers)
+            {
+                _customersBindingList.Add(customer);
+            }
+
+            dataGridView.DataSource = _customersBindingList;
+            ConfigureCustomerColumns();
+        }
+
+        private void LoadTransactions()
+        {
+            var sortBy = cmbSort.SelectedItem?.ToString() ?? "Date Added";
+            var transactions = GetTransactionsSorted(sortBy);
+
+            _transactionsBindingList.Clear();
+            foreach (var transaction in transactions)
+            {
+                _transactionsBindingList.Add(transaction);
+            }
+
+            dataGridView.DataSource = _transactionsBindingList;
+            ConfigureTransactionColumns();
+        }
+
+        private List<Customer> GetCustomersSorted(string sortBy)
+        {
+            return sortBy switch
+            {
+                "Account" => _unitOfWork.Customers.GetAll()
+                    .OrderBy(c => c.Account).ToList(),
+                "Date Added" => _unitOfWork.Customers.GetAll()
+                    .OrderByDescending(c => c.CreatedAt).ToList(),
+                _ => _unitOfWork.Customers.GetAll()
+                    .OrderBy(c => c.CustomerName).ToList()
+            };
+        }
+
+        private List<Transaction> GetTransactionsSorted(string sortBy)
+        {
+            var transactions = _unitOfWork.Transactions.GetAllWithCustomers();
+
+            return sortBy switch
+            {
+                "Account" => transactions.OrderBy(t => t.Account).ToList(),
+                "Name" => transactions.OrderBy(t => t.Customer.CustomerName).ToList(),
+                "Amount" => transactions.OrderByDescending(t => t.Amount).ToList(),
+                _ => transactions.OrderByDescending(t => t.CreatedAt).ToList()
+            };
+        }
+
+        private void ConfigureCustomerColumns()
+        {
+            dataGridView.Columns.Clear();
+
+            AddColumn("CustomerId", "ID", 50);
+            AddColumn("CustomerName", "Name", 150);
+            AddColumn("Account", "Account", 100);
+            AddColumn("CreatedAt", "Created", 80);
+
+            AddDeleteButtonColumn();
+        }
+
+        private void ConfigureTransactionColumns()
+        {
+            dataGridView.Columns.Clear();
+
+            AddColumn("TransactionId", "ID", 50);
+            AddColumn("Account", "Account", 100);
+            AddColumn("Amount", "Amount", 80);
+            AddColumn("CreatedAt", "Date", 100);
+
+            AddDeleteButtonColumn();
+        }
+
+        private void AddColumn(string propertyName, string headerText, int width)
+        {
+            dataGridView.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                DataPropertyName = propertyName,
+                HeaderText = headerText,
+                Width = width,
+                ReadOnly = true
+            });
+        }
+
+        private void AddDeleteButtonColumn()
+        {
+            var deleteColumn = new DataGridViewButtonColumn
+            {
+                Name = "Delete",
+                HeaderText = "Action",
+                Text = "Delete",
+                UseColumnTextForButtonValue = true,
+                Width = 70,
+                FlatStyle = FlatStyle.Flat
+            };
+            dataGridView.Columns.Add(deleteColumn);
+        }
+
+        private void BtnAdd_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                if (_currentViewMode == ViewMode.Customers)
+                {
+                    AddCustomer();
+                }
+                else
+                {
+                    AddTransaction();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error adding record: {ex.Message}", "Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void BtnEdit_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                if (_currentViewMode == ViewMode.Customers)
+                {
+                    EditCustomer();
+                }
+                else
+                {
+                    EditTransaction();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error editing record: {ex.Message}", "Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void AddCustomer()
+        {
+            using (var form = new AddCustomerForm(_unitOfWork))
+            {
+                if (form.ShowDialog() == DialogResult.OK)
+                {
+                    LoadCustomers();
+                }
+            }
+        }
+
+        private void EditCustomer()
+        {
+            if (dataGridView.CurrentRow?.DataBoundItem is not Customer selectedCustomer)
+            {
+                MessageBox.Show("Please select a customer to edit.", "Information",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            using (var form = new EditCustomerForm(_unitOfWork, selectedCustomer.CustomerId))
+            {
+                if (form.ShowDialog() == DialogResult.OK)
+                {
+                    LoadCustomers();
+                }
+            }
+        }
+
+        private void AddTransaction()
+        {
+            using (var form = new AddTransactionForm(_unitOfWork))
+            {
+                if (form.ShowDialog() == DialogResult.OK)
+                {
+                    LoadTransactions();
+                }
+            }
+        }
+
+        private void EditTransaction()
+        {
+            if (dataGridView.CurrentRow?.DataBoundItem is not Transaction selectedTransaction)
+            {
+                MessageBox.Show("Please select a transaction to edit.", "Information",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            using (var form = new EditTransactionForm(_unitOfWork, selectedTransaction.TransactionId))
+            {
+                if (form.ShowDialog() == DialogResult.OK)
+                {
+                    LoadTransactions();
+                }
+            }
         }
 
         private void DataGridView_CellContentClick(object sender, DataGridViewCellEventArgs e)
         {
-            if (dataGridView.Columns[e.ColumnIndex].Name == "Delete" && e.RowIndex >= 0)
-            {
-                var customerId = (int)dataGridView.Rows[e.RowIndex].Cells["CustomerId"].Value;
-                var customerName = dataGridView.Rows[e.RowIndex].Cells["CustomerName"].Value.ToString();
+            if (e.RowIndex < 0 || e.ColumnIndex < 0) return;
 
-                var confirm = MessageBox.Show(
-                    $"Are you sure you want to delete '{customerName}'?",
+            if (dataGridView.Columns[e.ColumnIndex].Name == "Delete")
+            {
+                DeleteRecord(e.RowIndex);
+            }
+        }
+
+        private void DeleteRecord(int rowIndex)
+        {
+            try
+            {
+                var record = dataGridView.Rows[rowIndex].DataBoundItem;
+                string recordType = _currentViewMode == ViewMode.Customers ? "customer" : "transaction";
+                string recordName = _currentViewMode == ViewMode.Customers ?
+                    ((Customer)record).CustomerName : $"Transaction #{((Transaction)record).TransactionId}";
+
+                var result = MessageBox.Show(
+                    $"Are you sure you want to delete {recordName}?",
                     "Confirm Delete",
                     MessageBoxButtons.YesNo,
                     MessageBoxIcon.Warning
                 );
 
-                if (confirm == DialogResult.Yes)
+                if (result == DialogResult.Yes)
                 {
-                    try
+                    if (_currentViewMode == ViewMode.Customers)
                     {
-                        var customer = _unitOfWork.Customers.GetById(customerId);
-                        if (customer != null)
-                        {
-                            _unitOfWork.Customers.Delete(customer);
-                            _unitOfWork.SaveChanges();
-
-                            MessageBox.Show("Customer deleted successfully.");
-
-                            CustomerBtn_Click(null, EventArgs.Empty);
-                        }
+                        var customer = (Customer)record;
+                        _unitOfWork.Customers.Remove(customer);
                     }
-                    catch (Exception ex)
+                    else
                     {
-                        MessageBox.Show($"Error deleting customer: {ex.Message}");
+                        var transaction = (Transaction)record;
+                        _unitOfWork.Transactions.Remove(transaction);
                     }
+
+                    _unitOfWork.Complete();
+                    LoadData();
+
+                    MessageBox.Show($"{recordType} deleted successfully.", "Success",
+                        MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error deleting record: {ex.Message}", "Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
-        private void dataGridView_CellFormatting(object sender, DataGridViewCellFormattingEventArgs e)
+        private void DataGridView_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex < 0) return;
+
+            if (_currentViewMode == ViewMode.Customers)
+            {
+                EditCustomer();
+            }
+            else
+            {
+                EditTransaction();
+            }
+        }
+
+        private void DataGridView_CellFormatting(object sender, DataGridViewCellFormattingEventArgs e)
         {
             if (dataGridView.Columns[e.ColumnIndex].Name == "Delete" && e.RowIndex >= 0)
             {
                 dataGridView.Rows[e.RowIndex].Cells[e.ColumnIndex].Style.ForeColor = Color.Red;
-                dataGridView.Rows[e.RowIndex].Cells[e.ColumnIndex].Style.Font = new Font(dataGridView.Font, FontStyle.Bold);
-                dataGridView.Rows[e.RowIndex].Cells[e.ColumnIndex].Style.Alignment = DataGridViewContentAlignment.MiddleCenter;
+                dataGridView.Rows[e.RowIndex].Cells[e.ColumnIndex].Style.Font =
+                    new Font(dataGridView.Font, FontStyle.Bold);
             }
-        }
 
-        private void DataGridView_CellDoubleClick(object? sender, DataGridViewCellEventArgs e)
-        {
-            if (e.RowIndex < 0 || dataGridView.Columns[e.ColumnIndex].Name == "Delete")
-                return;
-
-            if (_currentTable == "Customers" || customerBtn.BackColor == Color.LightSteelBlue)
+            //format amount column for transactions
+            if (_currentViewMode == ViewMode.Transactions &&
+                dataGridView.Columns[e.ColumnIndex].DataPropertyName == "Amount")
             {
-                int customerId = (int)dataGridView.Rows[e.RowIndex].Cells["CustomerId"].Value;
-                OpenEnquiriesPortal(customerId, isCustomer: true);
-            }
-            else if (_currentTable == "Transactions" || transactionBtn.BackColor == Color.LightSteelBlue)
-            {
-                int transactionId = (int)dataGridView.Rows[e.RowIndex].Cells["TransactionId"].Value;
-                OpenEnquiriesPortal(transactionId, isCustomer: false);
-            }
-        }
-
-        private void OpenEnquiriesPortal(int id, bool isCustomer)
-        {
-            using (var context = new ApplicationDbContext())
-            {
-                if (isCustomer)
+                if (e.Value is decimal amount)
                 {
-                    var customer = context.Customers.FirstOrDefault(c => c.CustomerId == id);
-                    if (customer != null)
-                    {
-                        var portal = new EnquiresPortal(customer);
-                        portal.ShowDialog();
-                    }
+                    e.Value = amount.ToString("C2");
+                    e.FormattingApplied = true;
                 }
-                else
+            }
+
+            //format date columns
+            if (dataGridView.Columns[e.ColumnIndex].DataPropertyName == "CreatedDate" ||
+                dataGridView.Columns[e.ColumnIndex].DataPropertyName == "TransactionDate")
+            {
+                if (e.Value is DateTime date)
                 {
-                    var transaction = context.Transactions
-                                             .Include(t => t.Customer)
-                                             .FirstOrDefault(t => t.TransactionId == id);
-                    if (transaction != null)
-                    {
-                        var portal = new EnquiresPortal(transaction);
-                        portal.ShowDialog();
-                    }
+                    e.Value = date.ToString("yyyy-MM-dd");
+                    e.FormattingApplied = true;
                 }
             }
         }
 
-        private void SortComboBox_SelectedIndexChanged(object? sender, EventArgs e)
+        protected override void OnFormClosing(FormClosingEventArgs e)
         {
-            var comboBox = sender as ComboBox;
-            _selectedSort = comboBox.SelectedItem?.ToString() ?? "Name";
-            dataGridView.DataSource = LoadCustomers(_selectedSort);
+            _unitOfWork?.Dispose();
+            base.OnFormClosing(e);
         }
 
-        private void CustomerSortComboBox_SelectedIndexChanged(object? sender, EventArgs e)
+        private void CmbSort_SelectedIndexChanged(object sender, EventArgs e)
         {
-            _selectedSort = _customerSortComboBox.SelectedItem?.ToString() ?? "Name";
-            dataGridView.DataSource = LoadCustomers(_selectedSort);
+            LoadData();
         }
 
-        private void TransactionSortComboBox_SelectedIndexChanged(object? sender, EventArgs e)
-        {
-            _selectedTransactionSort = _transactionSortComboBox.SelectedItem?.ToString() ?? "Date Added";
-            dataGridView.DataSource = LoadTransactions(_selectedTransactionSort);
-        }
-
-        private void splitContainer1_Panel1_Paint(object sender, PaintEventArgs e)
+        private void MainForm_Load(object sender, EventArgs e)
         {
 
         }
-
-        private void Form1_Load(object sender, EventArgs e)
-        {
-
-        }
-
     }
 }

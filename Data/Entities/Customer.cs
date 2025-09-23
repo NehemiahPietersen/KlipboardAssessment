@@ -16,16 +16,16 @@ namespace CustomerManager.Data.Entities
 
         [Required]
         [MaxLength(50)]
-        public string CustomerName { get; set; }
+        public string? CustomerName { get; set; }
 
         [Required]
         [MaxLength(15)]
-        public string Account { get; set; }
+        public string? Account { get; set; }
 
         public decimal Balance { get; set; } = 0; //default to 0 not null?
 
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow; //don' show though
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow; //don't show though
 
-        public virtual ICollection<Transaction> Transactions { get; set; }
+        public virtual ICollection<Transaction> Transactions { get; set; } = new List<Transaction>();
     }
 }

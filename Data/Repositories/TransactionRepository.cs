@@ -1,4 +1,5 @@
 ﻿using CustomerManager.Data.Entities;
+using KlipBoardAssessment.Data.Repositories.Interface;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
@@ -6,36 +7,30 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace CustomerManager.Data.Repositories
+namespace KlipBoardAssessment.Data.Repositories
 {
     public class TransactionRepository : Repository<Transaction>, ITransactionRepository
     {
         public TransactionRepository(ApplicationDbContext context) : base(context)
         {
         }
-
-        public async Task<Transaction> GetByAccountAsync(string accountNumber)
+        public decimal GetAccountBalance(string accountNumber)
         {
-            return await _context.Transactions
-            .FirstOrDefaultAsync(t => t.Account == accountNumber);
+            return DbSet.Where(t => t.Account == accountNumber)
+                   .Sum(t => t.Amount);
         }
 
-        public async Task<IEnumerable<Transaction>> GetTransactionByCustomerAccountAsync(string account)
+        public IEnumerable<Transaction> GetTransactionsByAccount(string accountNumber)
         {
-            return await _context.Transactions
-                .Where(t => t.Account == account)
-                .Include(t => t.Customer)
-                .ToListAsync();
+            return DbSet.Where(t => t.Account == accountNumber)
+                   .OrderByDescending(t => t.CreatedAt)
+                   .ToList();
         }
 
-        public async Task<IEnumerable<Transaction>> GetTransactionsBasedOnTransactionTypeAsync(char userValue)
+        public IEnumerable<Transaction> GetAllWithCustomers()
         {
-            return await _context.Transactions
-                .Where(t => t.TransactionType == userValue)
-                .Include(t => t.Customer)
-                .ToListAsync();
+            return DbSet.Include(t => t.Customer).ToList();
         }
 
-        //todo maybe getTransactionByDate as well?
     }
 }

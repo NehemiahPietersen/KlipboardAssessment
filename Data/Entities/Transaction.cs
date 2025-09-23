@@ -25,9 +25,9 @@ namespace CustomerManager.Data.Entities
 
         [Required]
         [ForeignKey("Customer")]
-        public string Account { get; set; }
+        public string? Account { get; set; }
 
-        public virtual Customer Customer { get; set; }
+        public virtual Customer? Customer { get; set; }
 
     }
 }

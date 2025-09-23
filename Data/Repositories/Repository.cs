@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using KlipBoardAssessment.Data.Repositories.Interface;
+using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -6,48 +7,52 @@ using System.Linq.Expressions;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace CustomerManager.Data.Repositories
+namespace KlipBoardAssessment.Data.Repositories
 {
     public class Repository<T> : IRepository<T> where T : class
     {
-        protected readonly  ApplicationDbContext _context;
-        protected readonly  DbSet<T> _dbSet;
+        protected readonly DbContext Context;
+        protected readonly DbSet<T> DbSet;
 
-        public Repository(ApplicationDbContext context)
+        public Repository(DbContext context)
         {
-            _context = context;
-            _dbSet = _context.Set<T>();
-        }
-
-        public IEnumerable<T> GetAll()
-        {
-            return _dbSet.ToList();
-        }
-
-        public T GetById(int id)
-        {
-            return _dbSet.Find(id);
-        }
-
-        public IEnumerable<T> Find(Func<T, bool> predicate)
-        {
-            throw new NotImplementedException();
+            Context = context;
+            DbSet = context.Set<T>();
         }
 
         public void Add(T entity)
         {
-            _dbSet.Add(entity);
+            DbSet.Add(entity);
         }
 
-        public void Update(T entity)
+        public void AddRange(IEnumerable<T> entities)
         {
-            _dbSet.Attach(entity);
-            _context.Entry(entity).State = EntityState.Modified;
+            DbSet.AddRange(entities);
         }
 
-        public void Delete(T entity)
+        public IEnumerable<T> Find(Expression<Func<T, bool>> predicate)
         {
-            _dbSet.Remove(entity);
+            return DbSet.Where(predicate);
+        }
+
+        public IEnumerable<T> GetAll()
+        {
+            return DbSet.ToList();
+        }
+
+        public T GetById(int id)
+        {
+            return DbSet.Find(id);
+        }
+
+        public void Remove(T entity)
+        {
+            DbSet.Remove(entity);
+        }
+
+        public void RemoveRange(IEnumerable<T> entities)
+        {
+            DbSet.RemoveRange(entities);
         }
     }
 }
